@@ -1,5 +1,6 @@
 # Plugin Gestione Circolari
 Plugin che permette la gestione delle circolari scolastiche.<br />
+https://ps.w.org/gestione-circolari/assets/banner-772x250.png?rev=1659118
 
 ##Caratteristiche
 Il plugin implementa un nuovo custom post type Circolari<br />
