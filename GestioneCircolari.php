@@ -226,7 +226,7 @@ add_action('pre_get_posts','search_filter');
 
 function VisualizzaCircolari($atts){
 	require_once ( dirname (__FILE__) . '/admin/frontend.php' );
-	return $ret;
+	return "";
 }
 
 function VisualizzaCircolariHome(){
