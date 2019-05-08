@@ -10,6 +10,8 @@
 
 if(preg_match('#' . basename(__FILE__) . '#', $_SERVER['PHP_SELF'])) { die('You are not allowed to call this page directly.'); }
 
+$ret=Lista_Circolari($Anno,$Mese,$atts);
+
 add_filter( 'posts_where' , 'posts_where' );
 
 function posts_where( $where ) {
@@ -27,6 +29,11 @@ function posts_where( $where ) {
 	} 
 	
 	$GruppoUtente=get_user_meta($current_user->ID, "gruppo", true);
+	
+	if ( 0 == count($GruppoUtente)) {
+		return $where;
+	} 
+
 	if (is_array($GruppoUtente)){
 		$GruppiU="(";
 		foreach($GruppoUtente as $Gruppo){
@@ -42,22 +49,6 @@ function posts_where( $where ) {
 //	echo $where.$NewStrWhere;die();
 	return $where.$NewStrWhere;
 }
-if (isset($_REQUEST['Anno']))
-	$Anno = (int)$_REQUEST['Anno'];
-else
-	$Anno = date('Y');
-if (isset($_REQUEST['Mese']))
-	$Mese=(int)$_REQUEST['Mese'];
-elseif(isset($_REQUEST['Anno']))
-	$Mese="";
-else
-	$Mese=date('n');
-$atts = shortcode_atts(
-		array(
-			'archivio' => 'Mese',
-			'numcircolari' => 'All',
-		), $atts, 'VisCircolari' );
-$ret=Lista_Circolari($Anno,$Mese,$atts);
 
 function Lista_Circolari($Anno,$Mese,$Attributi){
 	ob_start();
@@ -88,6 +79,7 @@ function Lista_Circolari($Anno,$Mese,$Attributi){
 					   'paged' => ( get_query_var('paged') ? get_query_var('paged') : 1 ));		
 	}
 	$Circolari = new WP_Query( $args );
+	
 	if ($Circolari->post_count==0){
 		echo'<h3>Non risultano circolari per '.circ_MeseLettere($mesecorrente).' '.$annocorrente.' verranno visualizzate le ultime 5</h3>';
 		$args = array( 'category' => $IdCircolari,
@@ -181,46 +173,46 @@ function Lista_Circolari($Anno,$Mese,$Attributi){
 	print_r($Circolari);
 	echo "</pre>";die();
 	*/
-		if( $Circolari->max_num_pages <= 1 Or $Attributi['archivio']=="Mese")
-	        return ;
-		$links	=array();
-	    $paged = get_query_var( 'paged' ) ? absint( get_query_var( 'paged' ) ) : 1;
-	    $max   = intval( $Circolari->max_num_pages );
-	    /**    Add current page to the array */
-		$cp=get_query_var( 'paged' )==0?1:get_query_var( 'paged' ) ;
+	if( $Circolari->max_num_pages <= 1 Or $Attributi['archivio']=="Mese")
+		return ob_get_clean();
+	$links	=array();
+    $paged = get_query_var( 'paged' ) ? absint( get_query_var( 'paged' ) ) : 1;
+    $max   = intval( $Circolari->max_num_pages );
+    /**    Add current page to the array */
+	$cp=get_query_var( 'paged' )==0?1:get_query_var( 'paged' ) ;
 
-		echo '<div class="circpaging"><ul class="paginazione">' . "\n";
+	echo '<div class="circpaging"><ul class="paginazione">';
 
-		/** Prima Pagina */
-	    if( $Circolari->max_num_pages > 2 and $cp>1){
-			echo sprintf( '<li><a href="%s">%s</a></li>' . "\n", esc_url( get_pagenum_link( 1 ) ), '<i class="fa fa-fast-backward" aria-hidden="true"></i>' );	
-		}else{
-			echo sprintf( '<li>%s</li>' . "\n", '<i class="fa fa-fast-backward disabled" aria-hidden="true"></i>' );			
-		}
-	    /**    Pagina Precedente */
-	    if ( get_previous_posts_link() ){
-	        echo sprintf( '<li>%s</li>' . "\n", get_previous_posts_link("<i class=\"fa fa-backward\" aria-hidden=\"true\"></i>") );		
-		}else{
-	        echo sprintf( '<li>%s</li>' . "\n", "<i class=\"fa fa-backward disabled\" aria-hidden=\"true\"></i>" );			
-		}
+	/** Prima Pagina */
+    if( $Circolari->max_num_pages > 2 and $cp>1){
+		echo sprintf( '<li><a href="%s">%s</a></li>' , esc_url( get_pagenum_link( 1 ) ), '<i class="fa fa-fast-backward" aria-hidden="true"></i>' );	
+	}else{
+		echo sprintf( '<li>%s</li>', '<i class="fa fa-fast-backward disabled" aria-hidden="true"></i>' );			
+	}
+    /**    Pagina Precedente */
+    if ( get_previous_posts_link() ){
+        echo sprintf( '<li>%s</li>', get_previous_posts_link("<i class=\"fa fa-backward\" aria-hidden=\"true\"></i>") );		
+	}else{
+        echo sprintf( '<li>%s</li>', "<i class=\"fa fa-backward disabled\" aria-hidden=\"true\"></i>" );			
+	}
 
-	    /**   Pagina Successiva */
-		echo sprintf( '<li>%s/%s</li>' . "\n", $cp, $Circolari->max_num_pages  );
-	    if ( get_query_var( 'paged' ) < $Circolari->max_num_pages  ){
-	        echo sprintf( '<li><a href="%s">%s</a></li>' . "\n", esc_url( get_pagenum_link( $cp+1)),"<i class=\"fa fa-forward\" aria-hidden=\"true\"></i>" ); 		
-		}else{
-			echo sprintf( '<li>%s</li>' . "\n", "<i class=\"fa fa-forward disabled\" aria-hidden=\"true\" style=\"margin-left:5px;\"></i>" ); 	
-		}
-		/**   Ultima Pagina */
-		if( $Circolari->max_num_pages > 2 and $cp<$Circolari->max_num_pages){
-	        echo sprintf( '<li><a href="%s">%s</a></li>' . "\n",  esc_url( get_pagenum_link( $max ) ), "<i class=\"fa fa-fast-forward\" aria-hidden=\"true\"></i>" );
-	    }else{
-			echo sprintf( '<li>%s</a></li>' . "\n", "<i class=\"fa fa-fast-forward disabled\" aria-hidden=\"true\"></i>" );
-		}
+    /**   Pagina Successiva */
+	echo sprintf( '<li>%s/%s</li>', $cp, $Circolari->max_num_pages  );
+    if ( get_query_var( 'paged' ) < $Circolari->max_num_pages  ){
+        echo sprintf( '<li><a href="%s">%s</a></li>', esc_url( get_pagenum_link( $cp+1)),"<i class=\"fa fa-forward\" aria-hidden=\"true\"></i>" ); 		
+	}else{
+		echo sprintf( '<li>%s</li>', "<i class=\"fa fa-forward disabled\" aria-hidden=\"true\" style=\"margin-left:5px;\"></i>" ); 	
+	}
+	/**   Ultima Pagina */
+	if( $Circolari->max_num_pages > 2 and $cp<$Circolari->max_num_pages){
+        echo sprintf( '<li><a href="%s">%s</a></li>',  esc_url( get_pagenum_link( $max ) ), "<i class=\"fa fa-fast-forward\" aria-hidden=\"true\"></i>" );
+    }else{
+		echo sprintf( '<li>%s</a></li>', "<i class=\"fa fa-fast-forward disabled\" aria-hidden=\"true\"></i>" );
+	}
 
-	    /**    Next Post Link */
+    /**    Next Post Link */
 
-	    echo '</ul></div>' . "\n";
+    echo '</ul></div>';
 
 return ob_get_clean();
 }

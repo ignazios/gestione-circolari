@@ -33,6 +33,7 @@ include_once(Circolari_DIR."/admin/firme.php");
 include_once(Circolari_DIR."/functions.inc.php");
 include_once(Circolari_DIR."/GestioneCircolari.widget.php");
 include_once(Circolari_DIR."/GestioneNavigazioneCircolari.widget.php");
+include_once(Circolari_DIR."/GestioneCircolari_CustomPostType.php");
 include_once(Circolari_DIR."/admin/testi.php");
 $msg="";
 $TestiRisposte="";
@@ -61,7 +62,6 @@ if(isset($_REQUEST["op"])){
 }
 
 function Aggiornamento_Circolari() {
-    global $current_user ;
     if (Circolari_IS_Update_Firme()) {
         echo '<div class="error" style="background-color: #FFF8CC;"><p><strong>Aggiornamento MetaDati Circolari</strong>: questa nuova versione necessita di un aggiornamento del DataBase</P>
 <p><strong><em>Per eseguirla devi Cliccare <a href="' . admin_url() . 'edit.php?post_type=circolari&page=Utility&action=updfirme&CircoUtility='.wp_create_nonce("AggCampiFirma").'">qui</a></em></strong></p><p>Ti consiglio comunque di fare un Backup del DataBase prima di avviare l\'operazione</p></div>';
@@ -100,18 +100,52 @@ add_action( 'pre_get_posts', 'Circolari_admin_posts_filter_restrict_manage_posts
 if (isset($_GET['update']) And $_GET['update'] == 'true')
 	$stato="<div id='setting-error-settings_updated' class='updated settings-error'> 
 			<p><strong>Impostazioni salvate.</strong></p></div>";
-add_action('init', 'crea_custom_circolari');
 add_filter('post_updated_messages', 'circolari_updated_messages');
 add_action('save_post', 'circolari_salva_dettagli');
 add_action('add_meta_boxes','circolari_crea_box');
 add_filter('manage_posts_columns', 'circolari_NuoveColonne');  
 add_action('manage_posts_custom_column', 'circolari_NuoveColonneContenuto', 10, 2); 
-add_action( 'admin_menu', 'circolari_add_menu' ); 
-add_action('init', 'update_Impostazioni_Circolari');
-add_action('publish_circolari','AC_OnPublishPost' );
+add_action('admin_menu', 'circolari_add_menu' ); 
+//add_action('publish_circolari','AC_OnPublishPost' );
 add_filter('post_row_actions','remove_quick_edit',10,2);
 add_filter('wp_get_attachment_url', 'getFileUrl', 10, 2);
 
+function circolari_Inizializzazione(){
+	global $TestiRisposte,$Testi;
+/**
+*  Creazione del custom post type Circolari
+*/    
+	crea_custom_circolari();
+/**
+* Impostazione dei tipi di circolari e dei testi delle risposte 
+*/
+	if(FALSE!==($TestiRisposte=get_option('Circolari_TestiRisposte'))){
+    	$TestiRisposte= unserialize($TestiRisposte);
+    }
+   	if(FALSE!==($Testi=get_option('Circolari_Tipo'))){
+    	$Testi=unserialize($Testi);
+    }
+/**
+* Operazione eseguite per la memorizzazione dei parametri delle Circoalri
+*/
+    if(isset($_POST['Circolari_submit_button']) And 
+       $_POST['Circolari_submit_button'] == 'Salva Modifiche'){
+       	if (isset($_REQUEST['circoPar'])) 
+			if (wp_verify_nonce($_REQUEST['circoPar'],'ParametriCircolare')){
+			    update_option('Circolari_Visibilita_Pubblica',$_POST['pubblica'] );
+			    update_option('Circolari_Categoria',(int)$_POST['Categoria'] );
+			    update_option('Circolari_GGScadenza',(int)$_POST['GGScadenza'] );
+				update_option('Circolari_NrCircHome',(int)$_POST['NrCircHome'] );  				update_option('Circolari_EditorGutenberg',($_POST['Gutenberg']=="Si"?True:False) );
+				update_option('Circolari_NotificaFirma',$_POST['NotificaFirma'] );  		
+				update_option('Circolari_From_NotificaFirma',$_POST['FromNotificaFirma'] );  		
+				update_option('Circolari_Oggetto_NotificaFirma',$_POST['OggettoNotificaFirma'] );  		
+				update_option('Circolari_Messaggio_NotificaFirma',$_POST['MessaggioNotifica'] );  		
+				update_option('Circolari_GestPerm',$_POST['GestPerm'] );     
+				header('Location: '.get_bloginfo('wpurl').'/wp-admin/edit.php?post_type=circolari'); 
+			}
+	}
+}
+add_action('init', "circolari_Inizializzazione");
 
 /**
 * *************************************************
@@ -225,13 +259,30 @@ if (get_post_type()=='newsletter' ) {
 add_action('pre_get_posts','search_filter');
 
 function VisualizzaCircolari($atts){
+	$ret="";
+	if (isset($_REQUEST['Anno']))
+		$Anno = (int)$_REQUEST['Anno'];
+	else
+		$Anno = date('Y');
+	if (isset($_REQUEST['Mese']))
+		$Mese=(int)$_REQUEST['Mese'];
+	elseif(isset($_REQUEST['Anno']))
+		$Mese="";
+	else
+		$Mese=date('n');
+	$atts = shortcode_atts(
+			array(
+				'archivio' => 'Mese',
+				'numcircolari' => 'All',
+			), $atts, 'VisCircolari' );
 	require_once ( dirname (__FILE__) . '/admin/frontend.php' );
-	return "";
+	return $ret;
 }
 
 function VisualizzaCircolariHome(){
-require_once ( dirname (__FILE__) . '/admin/frontendhome.php' );
-return $ret;
+	$ret="";
+	require_once ( dirname (__FILE__) . '/admin/frontendhome.php' );
+	return $ret;
 }
       
 function FiltroVisualizzaCircolare( $content ){
@@ -375,6 +426,10 @@ function circolari_activate() {
 	if(get_option('Circolari_NrCircHome')== ''||!get_option('Circolari_NrCircHome')){
 		add_option('Circolari_NrCircHome', '0');
 	}
+	if(get_option('Circolari_EditorGutenberg') == '' || 
+	  !get_option('Circolari_EditorGutenberg')){
+			add_option('Circolari_EditorGutenberg', '0');
+	}
 	if(get_option('Circolari_NotificaFirma')== ''||!get_option('Circolari_NotificaFirma')){
 		add_option('Circolari_NotificaFirma', 'No');
 	}
@@ -407,7 +462,7 @@ $TestiRisposte=array(new Circolari_Risposta(0,"Non Firmata","Non Firmare la"),
 add_option('Circolari_TestiRisposte', serialize($TestiRisposte));
 }
 function circolari_CreaTesti(){
-$Testi=array(new Circolari_Tipo("NoFirma","Informativa","","La circolare non richiede conferma","","",array()),
+$Testi=array(new Circolari_Tipo("NoFirma","Informativa","","La circolare non richiede conferma","Firma non prevista","",array()),
 		new Circolari_Tipo("Sciopero","Adesioni allo sciopero","Sciopero","Adesione","La circolare si riferisce ad uno sciopero.<br />Bisogna indicare Si/No/Presa Visione","Adesione allo sciopero",array(1,2,3)),
         new Circolari_Tipo("Firma","Firme","Circolare ordinaria","Da Firmare","&Egrave; richiesta la firma alla circolare ordinaria","Firma la circolare ordinaria",array(4)),
         new Circolari_Tipo("Assemblea","Partecipazioni all\'assemblea","Assembea Sindacale","Partecipazione","La circolare si riferisce ad una assemblea sindacale.<br />Bisogna indicare Si/No","Partecipazione all\'assemblea",array(1,2)));
@@ -913,51 +968,11 @@ echo '
 </div>';	
 }
 function circolari_Utility($Stato=""){
-	echo '<div class="wrap">
+echo '<div class="wrap">
 		<i class="fa fa-cogs fa-3x" aria-hidden="true"></i> <h2 style="display:inline;margin-left:10px;vertical-align:super;">Utility Circolari</h2>';
-	if ($Stato!="") 
-		echo '<div id="message" class="updated"><p>'.str_replace("%%br%%","<br />",$Stato).'</p></div>
-		  <meta http-equiv="refresh" content="5;url=admin.php?page=utility"/>';
-	echo '		</div> 
-			<p></p>
-			<div class="widefat" style="padding:10px;">
-				<p style="text-align:center;font-size:1.5em;font-weight: bold;">Verifica procedura</p>
-				<ul>
-					<li> Questa procedura esegue un test generale della procedura e riporta eventuali anomalie nei dati e nelle impostazioni.</spam><br /><spam style="font-size:1em;font-style: italic;margin-left:10px;font-weight: bold;">
-		Verifica Presenza data scadenza firma <spam style="text-align:center;font-size:1.5em;font-weight: bold;"> <a href="edit.php?post_type=circolari&page=Utility&action=versca">Verifica</a></spam>
-					</li>
-					<li style="text-align:left;font-size:1em;">Questa procedura verifica il formato delle date di scadenza.<br /><spam style="font-size:1em;font-style: italic;margin-left:10px;font-weight: bold;">
-		Verifica Formato data scadenza firma <spam style="text-align:center;font-size:1.5em;font-weight: bold;"> <a href="edit.php?post_type=circolari&page=Utility&action=verforsca">Verifica</a></spam>
-					</li>
-				</ul>
-				<p style="text-align:center;font-size:1.5em;font-weight: bold;">Importa Gruppi ed impostazioni da Circolari Groups</p>
-					<ul>
-						<li style="text-align:left;font-size:1em;">
-						<p>Questa procedura deve essere eseguita solo una volta dopo la migrazione da Circolari Groups.</p>
-						<p>Azioni da eseguire per la migrazione:
-						<ol>
-							<li><span style="color:red;font-weight: bold;">Aggiornare il plugin Circolari Groups</span></li>
-							<li>Disinstallare Circolari Groups</li>
-							<li>Installare Circolari</li>
-							<li>Lanciare la seguente procedura di importazione dei dati da Circolari Groups</li>
-							<li>A questo punto, se non utilizzato per altri scopi, si può disinstallare il plugin Groups</li>
-						</ol>
-						</p>
-						<p>
-						Le oprazioni che verranno eseguite sono:
-						<ol>
-							<li>Importazione dei Gruppi</li>
-							<li>Aggiornamento delle impostazioni delle circolari</li>
-						</ol>
-						</li>
-						</p>
-					</ul>
-					<spam style="text-align:center;font-size:1.5em;font-weight: bold;">
-						<a href="edit.php?post_type=circolari&page=Utility&action=importa">Importa da Circolari Groups</a>
-					</spam>	
-	';
-	$lista="";
-	$azione= filter_input(INPUT_GET, "action");
+$lista="";
+$azione= filter_input(INPUT_GET, "action");
+if($azione){
 	switch ($azione){
 		case "versca":			
 			echo "<p style='text-align:center;font-size:1.5em;font-weight: bold;'>Stato Operazioni:</p>";
@@ -966,6 +981,7 @@ function circolari_Utility($Stato=""){
 				foreach($Posts as $post){
 					$Adesione=get_post_meta($post->ID, "_sciopero",TRUE);
 					$firma=get_post_meta($post->ID, "_sign",TRUE);
+					var_dump($firma);wp_die();
 					if (($firma!="NoFirma") and empty($scadenza)){
 						$lista.="			<li>$post->ID $post->post_title $post->post_date_gmt";
 						if (isset($_GET['opt']) && $_GET['opt']=="aggsca"){
@@ -1038,7 +1054,7 @@ function circolari_Utility($Stato=""){
 				$NC1=get_post_meta($post->ID,"_numero");
 				$NC2=get_post_meta($post->ID,"_anno");
 				if (isset($sign[0]))
-					echo "Circolare ".$post->ID."  N. ".$NC1[0]."_".$NC2[0]." gi&aacute; Aggiornato";
+					echo "<strong><em>Circolare ".$post->ID."  N. ".$NC1[0]."_".$NC2[0]." gi&aacute; Aggiornato</strong></em> ";
 				else{
 					echo "Circolare ".$post->ID."  N. ".$NC1[0]."_".$NC2[0]." Aggiornata a:";
 					if ($sciopero[0]=="Si"){
@@ -1053,11 +1069,13 @@ function circolari_Utility($Stato=""){
 							update_post_meta($post->ID,"_sign","NoFirma" );
 							echo "NoFirma";
 						}
-					echo " Cancellata per questa circolare l'impostazione";
+					$Calcellata="";
 					if(delete_post_meta($post->ID, "_firma")==TRUE)
-						echo " Firma ";
+						$Calcellata= " Firma ";
 					if(delete_post_meta($post->ID, "_sciopero")==TRUE)
-						echo " Sciopero";
+						$Calcellata= " Sciopero";
+					if($Calcellata!="")
+						echo "<strong> Cancellata per questa circolare l'impostazione ".$Calcellata."</strong>"; 
 				}
 				echo "<br />";
 			}
@@ -1107,6 +1125,49 @@ function circolari_Utility($Stato=""){
 			}
 			break;
 		}
+	return;	
+}
+	if ($Stato!="") 
+		echo '<div id="message" class="updated"><p>'.str_replace("%%br%%","<br />",$Stato).'</p></div>
+		  <meta http-equiv="refresh" content="5;url=admin.php?page=utility"/>';
+	echo '		</div> 
+			<p></p>
+			<div class="widefat" style="padding:10px;">
+				<p style="text-align:center;font-size:1.5em;font-weight: bold;">Verifica procedura</p>
+				<ul>
+					<li> Questa procedura esegue un test generale della procedura e riporta eventuali anomalie nei dati e nelle impostazioni.</spam><br /><spam style="font-size:1em;font-style: italic;margin-left:10px;font-weight: bold;">
+		Verifica Presenza data scadenza firma <spam style="text-align:center;font-size:1.5em;font-weight: bold;"> <a href="edit.php?post_type=circolari&page=Utility&action=versca">Verifica</a></spam>
+					</li>
+					<li style="text-align:left;font-size:1em;">Questa procedura verifica il formato delle date di scadenza.<br /><spam style="font-size:1em;font-style: italic;margin-left:10px;font-weight: bold;">
+		Verifica Formato data scadenza firma <spam style="text-align:center;font-size:1.5em;font-weight: bold;"> <a href="edit.php?post_type=circolari&page=Utility&action=verforsca">Verifica</a></spam>
+					</li>
+				</ul>
+				<p style="text-align:center;font-size:1.5em;font-weight: bold;">Importa Gruppi ed impostazioni da Circolari Groups</p>
+					<ul>
+						<li style="text-align:left;font-size:1em;">
+						<p>Questa procedura deve essere eseguita solo una volta dopo la migrazione da Circolari Groups.</p>
+						<p>Azioni da eseguire per la migrazione:
+						<ol>
+							<li><span style="color:red;font-weight: bold;">Aggiornare il plugin Circolari Groups</span></li>
+							<li>Disinstallare Circolari Groups</li>
+							<li>Installare Circolari</li>
+							<li>Lanciare la seguente procedura di importazione dei dati da Circolari Groups</li>
+							<li>A questo punto, se non utilizzato per altri scopi, si può disinstallare il plugin Groups</li>
+						</ol>
+						</p>
+						<p>
+						Le oprazioni che verranno eseguite sono:
+						<ol>
+							<li>Importazione dei Gruppi</li>
+							<li>Aggiornamento delle impostazioni delle circolari</li>
+						</ol>
+						</li>
+						</p>
+					</ul>
+					<spam style="text-align:center;font-size:1.5em;font-weight: bold;">
+						<a href="edit.php?post_type=circolari&page=Utility&action=importa">Importa da Circolari Groups</a>
+					</spam>	
+	';
 }
 function TestataCircolari() {
 global $TestiRisposte;
@@ -1164,6 +1225,17 @@ function circolari_uninstall() {
 	$Circolari = get_posts( "post_type=circolari" );
 	foreach ( $Circolari as $Circolare )
 		set_post_type( $Circolare );	
+	delete_option('Circolari_Versione');
+	delete_option('Circolari_GestPerm');
+	delete_option('Circolari_Visibilita_Pubblica');
+	delete_option('Circolari_Categoria');
+	delete_option('Circolari_GGScadenza');
+	delete_option('Circolari_NrCircHome');
+	delete_option('Circolari_EditorGutenberg');
+	delete_option('Circolari_NotificaFirma');
+	delete_option('Circolari_From_NotificaFirma');
+	delete_option('Circolari_Tipo');
+	delete_option('Circolari_TestiRisposte');
 }
 
 function circolari_VisualizzaLog($IDPost){
@@ -1274,7 +1346,13 @@ function circolari_Parametri(){
 		$GPE=" checked='checked'";
 	else
 		$GPP=" checked='checked'";
-echo'
+   	$CircolatiGutenberg=get_option('Circolari_EditorGutenberg');
+	if($CircolatiGutenberg){
+		$CKGutenberg="checked";
+	}else{
+		$CKGutenberg="";
+	}
+	echo'
 <div class="wrap">
 	  <i class="fa fa-magic fa-3x" aria-hidden="true"></i><h2 style="display:inline;margin-left:10px;vertical-align:super;">Configurazione Circolari</h2>
 	  <form name="Circolari_cnf" action="'.get_bloginfo('wpurl').'/wp-admin/index.php" method="post">
@@ -1309,6 +1387,12 @@ echo'			</td>
 			<th scope="row"><label for="NrCircHome">N. di circolari da visionare in home</label></th>
 			<td>
 				<input type="text" name="NrCircHome" id="NrCircHome" size="3" maxlength="3" value="'.$NrCircolariHome.'" />
+			</td>				
+		</tr>
+		<tr valign="top">
+			<th scope="row"><label for="Gutenberg">Utilizza editor Gutenberg</label></th>
+			<td>
+				<input type="checkbox" name="Gutenberg" id="Gutenberg" value="Si" '.$CKGutenberg.'/>
 			</td>				
 		</tr>
 		<tr valign="top">
@@ -1385,26 +1469,6 @@ echo'			</td>
 	    </form>
 	    </div>';
 }
-
-function update_Impostazioni_Circolari(){
-    if(isset($_POST['Circolari_submit_button']) And 
-       $_POST['Circolari_submit_button'] == 'Salva Modifiche'){
-       	if (isset($_REQUEST['circoPar'])) 
-			if (wp_verify_nonce($_REQUEST['circoPar'],'ParametriCircolare')){
-			    update_option('Circolari_Visibilita_Pubblica',$_POST['pubblica'] );
-			    update_option('Circolari_Categoria',(int)$_POST['Categoria'] );
-			    update_option('Circolari_GGScadenza',(int)$_POST['GGScadenza'] );
-				update_option('Circolari_NrCircHome',(int)$_POST['NrCircHome'] );  		
-				update_option('Circolari_NotificaFirma',$_POST['NotificaFirma'] );  		
-				update_option('Circolari_From_NotificaFirma',$_POST['FromNotificaFirma'] );  		
-				update_option('Circolari_Oggetto_NotificaFirma',$_POST['OggettoNotificaFirma'] );  		
-				update_option('Circolari_Messaggio_NotificaFirma',$_POST['MessaggioNotifica'] );  		
-				update_option('Circolari_GestPerm',$_POST['GestPerm'] );     
-				header('Location: '.get_bloginfo('wpurl').'/wp-admin/edit.php?post_type=circolari'); 
-			}
-	}
-}
-
 // Nuova Colonna Gestione  
 function circolari_NuoveColonne($defaults) {  
 	if ($_GET['post_type']=="circolari"){
@@ -1501,70 +1565,7 @@ function circolari_NuoveColonneContenuto($column_name, $post_ID) {
 		}
 	}
 }  
-function crea_custom_circolari() {
-	global $TestiRisposte,$Testi;
-	if(FALSE!==($TestiRisposte=get_option('Circolari_TestiRisposte'))){
-    	$TestiRisposte= unserialize($TestiRisposte);
-    }
-   	if(FALSE!==($Testi=get_option('Circolari_Tipo'))){
-    	$Testi=unserialize($Testi);
-    }
-	if(get_option('Circolari_GestPerm')=="int"){
-		$cps=array();
-		$cp="post";
-	}	
-	else{
-	 	$cps=array(
-	        'edit_post'		 => "edit_circolare",
-			'read_post'		 => "read_circolare",
-			'delete_post'		 => "delete_circolare",
-			'edit_posts'		 => "edit_circolares",
-			'edit_others_posts'	 => "edit_others_circolares",
-			'publish_posts'		 => "publish_circolares",
-			'read_private_posts'	 => "read_private_circolares",
-	        'delete_posts'           => "delete_circolares",
-	        'delete_private_posts'   => "delete_private_circolares",
-	        'delete_published_posts' => "delete_published_circolares",
-	        'delete_others_posts'    => "delete_others_circolares",
-	        'edit_private_posts'     => "edit_private_circolares",
-	        'edit_published_posts'   => "edit_published_circolares");
-	    $cp="circolare";	
-		$role =get_role( 'administrator' );
 
-        /* Aggiunta dei ruoli all'Amministratore */
-        if ( !empty( $role ) ) {
-            $role->add_cap( 'manage_adesioni' );
-            $role->add_cap( 'send_circ@mail' );
-        }
-	}
-	register_post_type('circolari', array(
-		'labels' => array(
-		'name' => __( 'Circolari' ),
-		'singular_name' => __( 'Circolare' ),
-		'add_new' => __( 'Aggiungi Circolare' ),
-		'add_new_item' => 'Aggiungi nuova Circolare',
-		'edit' => __( 'Modifica' ),
-		'edit_item' => __( 'Modifica Circolare' ),
-		'new_item' => __( 'Nuova Circolare' ),
-		'items_archive' => __( 'Circolare Aggiornata' ),
-		'view' => __( 'Visualizza Circolare' ),
-		'view_item' => __( 'Visualizza' ),
-		'search_items' => __( 'Cerca Circolare' ),
-		'not_found' => __( 'Nessuna Circolare trovata' ),
-		'not_found_in_trash' => __( 'Nessuna Circolare trovata nel cestino' ),
-		'parent' => __( 'Circolare superiore' )),
-		'public' => true,
-		'show_ui' => true,
-		'show_in_admin_bar' => true,
-		'menu_position' => 5,
-		'capability_type' => $cp,
-		'capabilities' => $cps,
-		'hierarchical' => false,
-		'has_archive' => true,
-		'menu_icon' => plugins_url( 'img/circolare.png', __FILE__ ),
-	//   'taxonomies' => array('category'),  
-		'supports' => array('title', 'editor', 'author','excerpt')));
-}
 // add links/menus to the admin bar
 
 function circolari_admin_bar_render() {
@@ -1599,7 +1600,6 @@ function circolari_updated_messages( $messages ) {
 return $messages;
 }
 function circolari_salva_dettagli( $post_id ){
-	global $wpdb,$table_prefix;
 //	print_r($_POST);exit;
 		if ( filter_input(INPUT_POST,'post_type') == 'circolari' ) {	
 			delete_post_meta( $post_id, '_scadenza' );
@@ -1625,7 +1625,9 @@ function circolari_salva_dettagli( $post_id ){
 				update_post_meta( $post_id, '_sign', $_POST["Sign"]);
 			else
 				update_post_meta( $post_id, '_sign', "NoFirma");
-			if (isset($_POST["numero"]))  update_post_meta( $post_id, '_numero', (int)$_POST["numero"]);
+			if (isset($_POST["numero"])){
+				  update_post_meta( $post_id, '_numero', (int)$_POST["numero"]);
+			}
 			if (isset($_POST["anno"])) update_post_meta( $post_id, '_anno', $_POST["anno"]);
 			if (isset($_POST["visibilita"])) update_post_meta( $post_id, '_visibilita', $_POST["visibilita"]);
 
@@ -1673,7 +1675,7 @@ if ($anno=="" or !$anno){
 if ($numero=="" or !$numero)
 	$numero=NewNumCircolare($anno);
 echo '<label>Numero/Anno</label>
-	<input type="text" name="numero" value="'.$numero.'" size="5" style="text-align:right"/>_<input type="text" name="anno" value="'.$anno.'" size="5"/>
+	<input type="text" name="numero" value="'.$numero.'" size="5" id="numero_circolare" style="text-align:right"/>_<input type="text" name="anno" value="'.$anno.'" size="5"/>
 	<br />' ;
 }
 

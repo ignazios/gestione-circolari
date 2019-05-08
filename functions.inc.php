@@ -764,13 +764,19 @@ function Circolari_find_Index_Risposta($IDRisposta){
 }
 function Circolari_IS_Update_Firme(){
 	global $wpdb,$table_prefix;
-	$Sql="SELECT $wpdb->posts.ID,$wpdb->posts.post_title
+	$Sql="SELECT $wpdb->posts.ID
 		  FROM $wpdb->posts inner join $wpdb->postmeta on
 		   ($wpdb->posts.ID = $wpdb->postmeta.post_id)
 		  WHERE ($wpdb->posts.post_type   ='circolari')
 		    and ($wpdb->postmeta.meta_key = '_firma' or $wpdb->postmeta.meta_key = '_sciopero') ";
-	$ris= $wpdb->get_results($Sql);
-	if(count($ris)>0)
+	$CircoalriOldFirma= count($wpdb->get_results($Sql));
+	$Sql="SELECT $wpdb->posts.ID
+		  FROM $wpdb->posts left join $wpdb->postmeta on
+		   ($wpdb->posts.ID = $wpdb->postmeta.post_id)
+		  WHERE ($wpdb->posts.post_type   ='circolari')
+		    and ($wpdb->postmeta.meta_key = '_firma' or $wpdb->postmeta.meta_key = '_sciopero' or $wpdb->postmeta.meta_key = '_sign') group by $wpdb->posts.ID";
+	$CircoalriOldNoFirma= count($wpdb->get_results($Sql));
+	if($CircoalriOldFirma>0 or (count(wp_count_posts("circolari"))-$CircoalriOldNoFirma)>0)
 		return True;
 	else
 		return False;

@@ -58,10 +58,8 @@ class NavCircolariWidget extends WP_Widget
 
 public function widget( $args, $instance )
     {
- 		global $post;
- 	    extract( $args );
-		$CurPage='http://' . $_SERVER['SERVER_NAME'] . $_SERVER['REQUEST_URI'];
-		if (substr($CurPage,0,strlen($instance['pagina_circolari']))!=$instance['pagina_circolari'])
+	    extract( $args );
+		if ($instance['pagina_circolari']!=get_the_permalink())
 			return;
         $titolo = apply_filters('widget_title', $instance['titolo'] );
 		if ($titolo=='')
